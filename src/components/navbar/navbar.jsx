@@ -1,37 +1,61 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { FaBars, FaTimes } from "react-icons/fa"; // icons for toggle
+import { FaBars, FaTimes } from "react-icons/fa";
 
 function Navbar() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
   const username = localStorage.getItem("username") || "Guest";
+  const avatar =
+    localStorage.getItem("avatar") || "https://i.pravatar.cc/150?u=temp";
   const isLoggedIn = !!token;
 
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
-  const [notificationCount] = useState(Math.floor(Math.random() * 10) + 1); // dummy count
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [notificationCount] = useState(Math.floor(Math.random() * 10) + 1);
+
+  const dropdownRef = useRef(null);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("username");
+    localStorage.removeItem("avatar");
+    setShowDropdown(false);
     navigate("/login", { replace: true });
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      // Example: navigate to a search page
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery("");
+    }
   };
 
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollY && currentScrollY > 50) {
-        setIsVisible(false);
-      } else {
-        setIsVisible(true);
-      }
+      setIsVisible(currentScrollY <= lastScrollY || currentScrollY <= 50);
       setLastScrollY(currentScrollY);
     };
 
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+
     window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, [lastScrollY]);
 
   return (
@@ -66,33 +90,83 @@ function Navbar() {
               }`
             }
           >
-            Dashboard
+            Home
           </NavLink>
           <NavLink
-            to="/profile"
+            to="/contact"
             className={({ isActive }) =>
               `text-white no-underline px-4 py-2 rounded text-sm ${
                 isActive ? "bg-white/10 font-bold" : "hover:bg-white/10"
               }`
             }
           >
-            Profile
+            Contact
           </NavLink>
+
+           <NavLink
+            to="/about"
+            className={({ isActive }) =>
+              `text-white no-underline px-4 py-2 rounded text-sm ${
+                isActive ? "bg-white/10 font-bold" : "hover:bg-white/10"
+              }`
+            }
+          > 
+            About
+          </NavLink>
+
+          {/* Search (Desktop) */}
+          <form onSubmit={handleSearch} className="hidden sm:block flex-1 mx-6">
+            <input
+              type="text"
+              placeholder="Search..."
+              className="w-60 px-3 py-2 rounded-full bg-white/20 text-white placeholder-white/80 outline-none focus:bg-white/30 transition-all"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </form>
+
           {isLoggedIn ? (
-            <>
-              <span className="text-white text-sm flex items-center gap-1">
-                Welcome, {username}
-                <span className="bg-red-600 text-white text-xs rounded-full px-2 py-0.5 ml-1">
-                  {notificationCount}
-                </span>
-              </span>
+            <div className="relative" ref={dropdownRef}>
               <button
-                onClick={handleLogout}
-                className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700 transition-colors"
+                onClick={() => setShowDropdown((prev) => !prev)}
+                className="flex items-center gap-2 text-white text-sm"
               >
-                Logout
+                <img
+                  src={avatar}
+                  alt="avatar"
+                  className="w-9 h-9 rounded-full object-cover border-2 border-white"
+                />
+                <span className="hidden sm:inline">Hi, {username}</span>
               </button>
-            </>
+
+              {showDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg z-50 py-2 text-sm text-gray-800">
+                  <div className="px-4 py-2 font-semibold border-b">
+                    Options
+                  </div>
+                  <NavLink
+                    to="/profile"
+                    onClick={() => setShowDropdown(false)}
+                    className="block px-4 py-2 hover:bg-gray-100"
+                  >
+                    View Profile
+                  </NavLink>
+                  <NavLink
+                    to="/settings"
+                    onClick={() => setShowDropdown(false)}
+                    className="block px-4 py-2 hover:bg-gray-100"
+                  >
+                    Settings
+                  </NavLink>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <NavLink
               to="/signup"
@@ -107,6 +181,17 @@ function Navbar() {
       {/* Mobile menu dropdown */}
       {showMenu && (
         <div className="sm:hidden mt-4 space-y-4 px-4">
+          {/* Search (Mobile) */}
+          <form onSubmit={handleSearch}>
+            <input
+              type="text"
+              placeholder="Search..."
+              className="w-full px-3 py-2 rounded bg-white/20 text-white placeholder-white/80 outline-none focus:bg-white/30 transition-all"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </form>
+
           <NavLink
             to="/landing"
             className="block text-white no-underline px-4 py-2 rounded text-sm hover:bg-white/10"
@@ -121,14 +206,20 @@ function Navbar() {
           >
             Profile
           </NavLink>
+
           {isLoggedIn ? (
             <>
-              <span className="block text-white text-sm">
-                Welcome, {username}
-                <span className="bg-red-600 text-white text-xs rounded-full px-2 py-0.5 ml-2">
+              <div className="flex items-center gap-2 text-white text-sm">
+                <img
+                  src={avatar}
+                  alt="avatar"
+                  className="w-8 h-8 rounded-full object-cover border-2 border-white"
+                />
+                <span>Hi, {username}</span>
+                <span className="bg-red-600 text-white text-xs rounded-full px-2 py-0.5 ml-1">
                   {notificationCount}
                 </span>
-              </span>
+              </div>
               <button
                 onClick={() => {
                   handleLogout();
